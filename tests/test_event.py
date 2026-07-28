@@ -123,9 +123,7 @@ async def test_no_lutron_devices_creates_nothing(hass, lutron_entry) -> None:
 
 
 @pytest.mark.asyncio
-async def test_three_element_identifier_does_not_break_setup(
-    hass, pico_device
-) -> None:
+async def test_three_element_identifier_does_not_break_setup(hass, pico_device) -> None:
     """A foreign device with a non-2-tuple identifier must not kill setup.
 
     Registry identifiers are nominally (domain, id) pairs, but integrations
