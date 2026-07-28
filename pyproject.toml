@@ -1,0 +1,41 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    # HA's entity APIs are typed **kwargs: Any
+    "ANN401", # any-type
+    # Conflicts with the ruff formatter
+    "COM812", # missing-trailing-comma
+    "ISC001", # single-line-implicit-string-concatenation
+    # Conflicting docstring conventions; we follow D211/D212
+    "D203", # incorrect-blank-line-before-class
+    "D213", # multi-line-summary-second-line
+    # Boolean args/values are idiomatic in Home Assistant entity APIs
+    "FBT001", # boolean-type-hint-positional-argument
+    "FBT002", # boolean-default-value-positional-argument
+    "FBT003", # boolean-positional-value-in-call
+    # HA interface methods (flow steps taking user_input) must accept
+    # arguments they don't always use
+    "ARG002", # unused-method-argument
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",    # asserts are how pytest works
+    "ANN",     # test functions don't need type annotations
+    "D",       # relaxed docstring style in tests
+    "PLR2004", # magic values in assertions are fine
+    "SLF001",  # tests may poke at private state
+    "ARG001",  # fixtures often take unused arguments
+    "FBT",     # boolean literals in test calls are fine
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true

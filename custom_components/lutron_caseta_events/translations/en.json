@@ -1,0 +1,14 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Lutron Caséta Events",
+        "description": "Creates an event entity for every Pico and keypad button your Caséta bridge knows, attached to each button's existing device. There is nothing to configure — buttons are discovered automatically. If you pair new remotes later, reload this integration to pick them up."
+      }
+    },
+    "abort": {
+      "no_lutron_caseta": "Set up the Lutron Caséta integration first — this integration only re-exposes its button events.",
+      "single_instance_allowed": "Already configured. Only a single instance is needed — it covers every bridge."
+    }
+  }
+}
