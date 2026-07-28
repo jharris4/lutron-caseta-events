@@ -9,6 +9,8 @@ line-length = 88
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
+    # Licensing is handled by the repo-level LICENSE file, not per-file headers
+    "CPY001", # missing-copyright-notice
     # HA's entity APIs are typed **kwargs: Any
     "ANN401", # any-type
     # Conflicts with the ruff formatter
