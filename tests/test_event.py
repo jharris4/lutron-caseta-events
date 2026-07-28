@@ -123,6 +123,27 @@ async def test_no_lutron_devices_creates_nothing(hass, lutron_entry) -> None:
 
 
 @pytest.mark.asyncio
+async def test_three_element_identifier_does_not_break_setup(
+    hass, pico_device
+) -> None:
+    """A foreign device with a non-2-tuple identifier must not kill setup.
+
+    Registry identifiers are nominally (domain, id) pairs, but integrations
+    in the wild register longer tuples; scanning the whole registry has to
+    tolerate them (regression: ValueError: too many values to unpack).
+    """
+    other = MockConfigEntry(domain="weird")
+    other.add_to_hass(hass)
+    dr.async_get(hass).async_get_or_create(
+        config_entry_id=other.entry_id,
+        identifiers={("weird", "serial", "extra")},  # type: ignore[arg-type]
+        name="Nonconforming Device",
+    )
+    await setup_events_entry(hass, {pico_device.id: pico_triggers(pico_device.id)})
+    assert hass.states.get("event.closet_pico_on") is not None
+
+
+@pytest.mark.asyncio
 async def test_non_lutron_devices_ignored(hass, pico_device) -> None:
     """Devices from other integrations never reach trigger enumeration."""
     other = MockConfigEntry(domain="hue")

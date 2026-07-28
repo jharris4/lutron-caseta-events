@@ -13,6 +13,7 @@ same registry identifiers, so buttons appear on the Pico's own device page.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.components.device_automation import (
@@ -38,6 +39,8 @@ if TYPE_CHECKING:
     from homeassistant.core import Event, HomeAssistant
     from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+_LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -49,9 +52,13 @@ async def async_setup_entry(
     devices = {
         device.id: device
         for device in dev_registry.devices.values()
-        if any(domain == LUTRON_DOMAIN for domain, _ in device.identifiers)
+        if any(ident[0] == LUTRON_DOMAIN for ident in device.identifiers)
     }
     if not devices:
+        _LOGGER.warning(
+            "No Lutron Caséta devices found in the device registry; "
+            "no button entities created"
+        )
         return
 
     triggers_by_device = await async_get_device_automations(
@@ -71,6 +78,18 @@ async def async_setup_entry(
         entities.extend(
             LutronButtonEventEntity(device, button_type, actions)
             for button_type, actions in actions_by_button.items()
+        )
+    if not entities:
+        _LOGGER.warning(
+            "Found %d Lutron Caséta devices but none offered button triggers; "
+            "no button entities created",
+            len(devices),
+        )
+    else:
+        _LOGGER.debug(
+            "Created %d button event entities across %d Caséta devices",
+            len(entities),
+            len(devices),
         )
     async_add_entities(entities)
 
@@ -94,13 +113,17 @@ class LutronButtonEventEntity(EventEntity):
         """Wrap one (device, button) pair."""
         self._device_id = device.id
         self._button_type = button_type
-        serial = next(v for domain, v in device.identifiers if domain == LUTRON_DOMAIN)
+        serial = next(i[1] for i in device.identifiers if i[0] == LUTRON_DOMAIN)
         self._attr_unique_id = f"{serial}_{button_type}"
         self._attr_name = button_type.replace("_", " ").capitalize()
         self._attr_event_types = _ordered_event_types(actions)
-        # The same identifiers as the existing Caséta device, so the entity
-        # lands on the Pico/keypad's own device page instead of a new device.
-        self._attr_device_info = DeviceInfo(identifiers=set(device.identifiers))
+        # The device's Caséta identifiers only, so the entity lands on the
+        # Pico/keypad's own device page instead of a new device. Identifiers
+        # from other integrations sharing the device are not ours to declare
+        # (and may not even be well-formed 2-tuples).
+        self._attr_device_info = DeviceInfo(
+            identifiers={i for i in device.identifiers if i[0] == LUTRON_DOMAIN}
+        )
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to the Caséta integration's button announcements."""
