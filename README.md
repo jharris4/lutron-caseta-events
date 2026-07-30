@@ -28,7 +28,8 @@ Via [HACS](https://hacs.xyz/), as a custom repository:
 3. Install **Lutron Caséta Events**, restart Home Assistant
 4. Settings → Devices & services → **Add integration** → *Lutron Caséta Events*
 
-Requires the Lutron Caséta integration to be set up first.
+Requires Home Assistant 2025.8 or newer and the Lutron Caséta integration to
+be set up first.
 
 ## Usage notes
 

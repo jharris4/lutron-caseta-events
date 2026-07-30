@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import (
+    device_registry as dr,
+    entity_registry as er,
+    helper_integration,
+)
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.lutron_caseta_events.const import (
@@ -58,6 +63,53 @@ async def test_entities_created_per_button(hass, pico_device) -> None:
     entity = registry.async_get("event.closet_pico_on")
     assert entity.device_id == pico_device.id
     assert entity.unique_id == "68551522_on"
+
+
+@pytest.mark.asyncio
+async def test_cleans_up_helper_owned_device_fork(hass, pico_device) -> None:
+    """A 2026.8 fork created by an older release is removed and relinked."""
+    if not hasattr(pico_device, "config_entry_id"):
+        pytest.skip("Device forks are introduced by Home Assistant 2026.8")
+
+    entry = MockConfigEntry(domain=DOMAIN, title="Lutron Caséta Events")
+    entry.add_to_hass(hass)
+    registry = dr.async_get(hass)
+    duplicate = registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(LUTRON_DOMAIN, "68551522")},
+        name="Closet Pico",
+    )
+    assert duplicate.id != pico_device.id
+
+    await setup_events_entry(
+        hass,
+        {pico_device.id: pico_triggers(pico_device.id)},
+        entry,
+    )
+
+    assert registry.async_get(duplicate.id) is None
+    entity = er.async_get(hass).async_get("event.closet_pico_on")
+    assert entity.device_id == pico_device.id
+
+
+@pytest.mark.asyncio
+async def test_uses_version_appropriate_cleanup_helper(hass, pico_device) -> None:
+    """Use the non-deprecated helper name when Home Assistant provides it."""
+    helper_name = (
+        "async_remove_helper_devices"
+        if hasattr(helper_integration, "async_remove_helper_devices")
+        else "async_remove_helper_config_entry_from_source_device"
+    )
+    with patch.object(helper_integration, helper_name) as cleanup:
+        entry = await setup_events_entry(
+            hass, {pico_device.id: pico_triggers(pico_device.id)}
+        )
+
+    cleanup.assert_called_once_with(
+        hass,
+        helper_config_entry_id=entry.entry_id,
+        source_device_id=pico_device.id,
+    )
 
 
 @pytest.mark.asyncio
@@ -156,3 +208,31 @@ async def test_non_lutron_devices_ignored(hass, pico_device) -> None:
     assert not [
         s for s in hass.states.async_all() if s.entity_id.startswith("event.hue")
     ]
+
+
+@pytest.mark.asyncio
+async def test_foreign_device_with_lutron_identifier_ignored(hass, pico_device) -> None:
+    """A foreign config entry cannot impersonate a Caséta-owned device."""
+    other = MockConfigEntry(domain="foreign")
+    other.add_to_hass(hass)
+    dr.async_get(hass).async_get_or_create(
+        config_entry_id=other.entry_id,
+        identifiers={(LUTRON_DOMAIN, "foreign-serial")},
+        name="Foreign Device",
+    )
+    helper_name = (
+        "async_remove_helper_devices"
+        if hasattr(helper_integration, "async_remove_helper_devices")
+        else "async_remove_helper_config_entry_from_source_device"
+    )
+    with patch.object(helper_integration, helper_name) as cleanup:
+        entry = await setup_events_entry(
+            hass, {pico_device.id: pico_triggers(pico_device.id)}
+        )
+
+    assert hass.states.get("event.closet_pico_on") is not None
+    cleanup.assert_called_once_with(
+        hass,
+        helper_config_entry_id=entry.entry_id,
+        source_device_id=pico_device.id,
+    )

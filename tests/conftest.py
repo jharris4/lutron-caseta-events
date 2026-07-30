@@ -79,11 +79,14 @@ def pico_triggers(device_id: str) -> list[dict[str, str]]:
 
 
 async def setup_events_entry(
-    hass: HomeAssistant, triggers_by_device: dict[str, list[dict[str, str]]]
+    hass: HomeAssistant,
+    triggers_by_device: dict[str, list[dict[str, str]]],
+    entry: MockConfigEntry | None = None,
 ) -> MockConfigEntry:
     """Set up a Lutron Caséta Events entry against patched device triggers."""
-    entry = MockConfigEntry(domain=DOMAIN, title="Lutron Caséta Events")
-    entry.add_to_hass(hass)
+    if entry is None:
+        entry = MockConfigEntry(domain=DOMAIN, title="Lutron Caséta Events")
+        entry.add_to_hass(hass)
     with patch(
         "custom_components.lutron_caseta_events.event.async_get_device_automations",
         return_value=triggers_by_device,
