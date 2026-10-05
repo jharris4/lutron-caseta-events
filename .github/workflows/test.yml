@@ -3,6 +3,9 @@ name: Test
 on:
   push:
   pull_request:
+  # Weekly run against the latest Home Assistant to surface new deprecations
+  schedule:
+    - cron: "0 4 * * 1"
   workflow_dispatch:
 
 jobs:

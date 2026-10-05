@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.config_entries import ConfigFlow
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, frame
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     MockModule,
@@ -26,6 +27,30 @@ if TYPE_CHECKING:
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable loading of custom integrations in tests."""
     return
+
+
+@pytest.fixture(autouse=True)
+def fail_on_deprecation_reports(caplog: pytest.LogCaptureFixture):
+    """Fail any test during which HA reports deprecated usage by this integration.
+
+    HA announces deprecations via log records (frame.report_usage and the
+    helpers.deprecation decorators), not Python warnings, so a passing suite
+    would otherwise hide them until the deprecated API is finally removed.
+    """
+    # report_usage logs each call site only once per process; reset it so every
+    # test that hits a deprecation fails, not just the first.
+    getattr(frame, "_REPORTED_INTEGRATIONS", set()).clear()
+    yield
+    reports = [
+        record.getMessage()
+        for phase in ("setup", "call")
+        for record in caplog.get_records(phase)
+        if record.levelno >= logging.WARNING
+        and DOMAIN in record.getMessage()
+        and "deprecated" in record.getMessage().lower()
+    ]
+    if reports:
+        pytest.fail("Deprecated usage reported:\n" + "\n".join(reports))
 
 
 class _LutronFlow(ConfigFlow):
