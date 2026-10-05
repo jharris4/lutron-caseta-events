@@ -49,14 +49,16 @@ async def async_setup_entry(
 ) -> None:
     """Enumerate every Caséta button and create its event entity."""
     dev_registry = dr.async_get(hass)
-    lutron_entry_ids = {
-        lutron_entry.entry_id
-        for lutron_entry in hass.config_entries.async_entries(LUTRON_DOMAIN)
-    }
+    # Look devices up per Caséta entry: using registry.devices as a mapping is
+    # deprecated from Home Assistant 2026.9, while iterating it only yields
+    # entries (rather than ids) on the newest versions.
     devices = {
         device.id: device
-        for device in dev_registry.devices.values()
-        if _is_lutron_device(device, lutron_entry_ids)
+        for lutron_entry in hass.config_entries.async_entries(LUTRON_DOMAIN)
+        for device in dr.async_entries_for_config_entry(
+            dev_registry, lutron_entry.entry_id
+        )
+        if _is_lutron_device(device)
     }
     if not devices:
         _LOGGER.warning(
@@ -107,22 +109,9 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-def _is_lutron_device(device: dr.DeviceEntry, lutron_entry_ids: set[str]) -> bool:
-    """Return whether a device is owned by a Caséta config entry.
-
-    Home Assistant 2026.8 replaced config_entries with the singular
-    config_entry_id. Prefer the new attribute when present so accessing the
-    deprecated compatibility property does not generate a warning.
-    """
-    config_entry_id = getattr(device, "config_entry_id", None)
-    owned_by_lutron = (
-        config_entry_id in lutron_entry_ids
-        if config_entry_id is not None
-        else bool(device.config_entries & lutron_entry_ids)
-    )
-    return owned_by_lutron and any(
-        identifier[0] == LUTRON_DOMAIN for identifier in device.identifiers
-    )
+def _is_lutron_device(device: dr.DeviceEntry) -> bool:
+    """Return whether a Caséta entry's device carries a Caséta identifier."""
+    return any(identifier[0] == LUTRON_DOMAIN for identifier in device.identifiers)
 
 
 def _remove_helper_device_links(
